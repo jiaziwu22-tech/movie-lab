@@ -1,0 +1,532 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Movie Lab — a custom movie browser UI powered by the TMDB API.">
+<title>Movie Lab</title>
+<style>
+/* ============================================================
+   Movie Lab — custom UI: "Light Editorial" (明亮杂志 / 纸感编辑风)
+   单文件版：CSS 与 JS 全部内联，无需外部资源
+   ============================================================ */
+
+:root {
+  --paper: #faf8f3;
+  --paper-2: #f2ede4;
+  --ink: #171614;
+  --ink-soft: #4a4741;
+  --muted: #8a857b;
+  --line: #ddd6c8;
+  --accent: #b4462f;
+  --serif: Georgia, "Times New Roman", "Songti SC", serif;
+  --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 80px; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; }
+button, input, select { font: inherit; }
+button { cursor: pointer; border: 0; background: none; }
+button:disabled { opacity: .35; cursor: not-allowed; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+/* ---------- 顶栏：报纸报头 ---------- */
+.topbar {
+  position: sticky; top: 0; z-index: 40;
+  display: flex; align-items: baseline; gap: 34px;
+  padding: 20px max(5vw, 22px) 16px;
+  background: rgba(250, 248, 243, .95);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--ink);
+}
+.logo {
+  font-family: var(--serif); font-size: 27px; font-weight: 700; letter-spacing: -1px;
+  text-decoration: none; display: flex; align-items: baseline; gap: 6px;
+}
+.logo-mark { color: var(--accent); font-size: 12px; }
+.logo em { font-style: italic; color: var(--accent); }
+.topbar nav { display: flex; gap: 24px; font-size: 11px; font-weight: 700; letter-spacing: 1.6px; text-transform: uppercase; color: var(--ink-soft); }
+.topbar nav a { text-decoration: none; padding-bottom: 2px; border-bottom: 2px solid transparent; }
+.topbar nav a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.status-pill {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 8px;
+  font-size: 10px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase;
+  padding: 5px 12px; border: 1px solid var(--line); color: var(--muted);
+}
+.status-pill.live { color: var(--accent); border-color: var(--accent); }
+.status-pill .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--muted); }
+.status-pill.live .dot { background: var(--accent); }
+
+/* ---------- Hero：杂志头版 ---------- */
+.hero {
+  position: relative;
+  padding: clamp(50px, 7vw, 90px) max(5vw, 22px) clamp(40px, 5vw, 64px);
+  background-color: var(--paper);
+  background-size: cover; background-position: center;
+  border-bottom: 1px solid var(--line);
+}
+.hero.has-art { box-shadow: inset 0 -120px 140px -60px var(--paper); }
+.kicker {
+  margin: 0 0 18px; font-size: 10px; font-weight: 800; letter-spacing: 3.4px;
+  text-transform: uppercase; color: var(--accent);
+  border-top: 2px solid var(--ink); padding-top: 14px; max-width: 230px;
+}
+.hero-title {
+  margin: 0 0 20px; font-family: var(--serif);
+  font-size: clamp(42px, 6.2vw, 78px); line-height: 1.02; letter-spacing: -2.2px; font-weight: 700;
+  max-width: 820px;
+}
+.hero-title span { font-style: italic; color: var(--accent); }
+.hero-sub {
+  margin: 0 0 32px; font-size: 15px; line-height: 1.8; color: var(--ink-soft);
+  max-width: 480px; border-left: 3px solid var(--accent); padding-left: 16px;
+}
+.field { display: flex; max-width: 560px; border: 1px solid var(--ink); background: var(--paper); }
+.field:focus-within { box-shadow: 4px 4px 0 var(--accent); }
+.field input { flex: 1; min-width: 0; border: 0; background: transparent; padding: 13px 16px; color: var(--ink); font-size: 14px; }
+.field input::placeholder { color: var(--muted); }
+.field button {
+  padding: 13px 26px; background: var(--ink); color: var(--paper);
+  font-size: 11px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase;
+}
+.label { display: block; font-size: 10px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 10px; }
+.hint { margin: 14px 0 0; font-size: 12px; color: var(--muted); line-height: 1.8; }
+.hint a { color: var(--accent); }
+.quick-actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+.ghost {
+  border: 1px solid var(--line); color: var(--ink-soft); padding: 9px 18px;
+  font-size: 10px; font-weight: 800; letter-spacing: 1.6px; text-transform: uppercase;
+}
+.ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ---------- 目录工具条 ---------- */
+.catalog { padding: clamp(34px, 5vw, 56px) max(5vw, 22px) 70px; }
+.toolbar { display: flex; align-items: flex-end; justify-content: space-between; gap: 22px; flex-wrap: wrap; border-bottom: 1px solid var(--ink); padding-bottom: 16px; }
+.toolbar h2 { margin: 0; font-family: var(--serif); font-size: clamp(24px, 3.2vw, 38px); letter-spacing: -1px; font-weight: 700; font-style: italic; }
+.tools { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.sel-wrap { display: inline-flex; align-items: center; gap: 8px; font-size: 10px; font-weight: 800; letter-spacing: 1.4px; text-transform: uppercase; color: var(--ink-soft); }
+.sel-wrap select { background: transparent; color: var(--ink); border: 0; border-bottom: 1px solid var(--ink); padding: 6px 4px; font-size: 12px; }
+.toggle { display: inline-flex; border: 1px solid var(--ink); }
+.toggle button { padding: 7px 12px; color: var(--ink-soft); font-size: 13px; border-right: 1px solid var(--line); }
+.toggle button:last-child { border-right: 0; }
+.toggle button.on { background: var(--ink); color: var(--paper); }
+.count { margin: 14px 0 30px; font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--muted); }
+
+/* ---------- 卡片 ---------- */
+.results.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 40px 28px; }
+.results.list { display: grid; gap: 20px; }
+.card { transition: opacity .25s; }
+.results.grid .card:hover { opacity: .82; }
+.results.list .card { display: grid; grid-template-columns: 96px 1fr; gap: 22px; align-items: start; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+.thumb { position: relative; aspect-ratio: 2 / 3; overflow: hidden; background: var(--paper-2); }
+.results.list .thumb { aspect-ratio: auto; height: 138px; width: 96px; }
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; filter: saturate(.9) contrast(1.04); }
+.results.grid .card:hover .thumb img { filter: none; }
+.thumb-fb {
+  display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 10px;
+  height: 100%; padding: 18px; text-align: center; background: var(--paper-2);
+}
+.thumb-fb strong { font-family: var(--serif); font-size: 15px; line-height: 1.3; color: var(--ink); }
+.thumb-fb span { font-size: 9px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--muted); }
+.yb {
+  position: absolute; bottom: 0; left: 0; background: var(--paper); color: var(--ink);
+  font-size: 10px; font-weight: 800; letter-spacing: 1.6px; padding: 5px 9px;
+}
+.body { padding: 14px 0 0; }
+.results.list .body { padding: 2px 0 0; }
+.body h3 { margin: 0 0 10px; font-family: var(--serif); font-size: 17px; line-height: 1.25; font-weight: 700; }
+.body h3 a { text-decoration: none; }
+.body h3 a:hover { color: var(--accent); }
+.score { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.bar { flex: 1; height: 1px; background: var(--line); position: relative; }
+.bar i { position: absolute; top: -1px; left: 0; height: 3px; }
+.bar i.good { background: #3d7a5c; }
+.bar i.ok { background: var(--accent); }
+.bar i.low { background: #9a9a92; }
+.score b { font-size: 12px; font-weight: 800; color: var(--accent); min-width: 34px; text-align: right; font-family: var(--serif); }
+.desc {
+  margin: 0; font-size: 12.5px; line-height: 1.75; color: var(--ink-soft);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.results.list .desc { -webkit-line-clamp: 2; }
+
+/* ---------- 骨架屏 ---------- */
+.skews.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 40px 28px; }
+.skews.list { display: grid; gap: 20px; }
+.skew-list { display: flex; gap: 22px; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+.skew-poster { aspect-ratio: 2 / 3; }
+.skews.list .skew-poster { width: 96px; height: 138px; aspect-ratio: auto; flex: none; }
+.skew-line { height: 9px; margin-top: 14px; }
+.skew-line.w70 { width: 70%; }
+.skew-line.w45 { width: 45%; }
+.skew-poster, .skew-line {
+  background-image: linear-gradient(90deg, #efe9de 0%, #e2dbcd 50%, #efe9de 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite linear;
+}
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+/* ---------- 面板 ---------- */
+.panel { border: 1px solid var(--ink); background: var(--paper-2); padding: 52px 28px; text-align: center; }
+.panel h3 { margin: 0 0 10px; font-family: var(--serif); font-size: 26px; font-weight: 700; font-style: italic; }
+.panel p { margin: 0 0 18px; color: var(--ink-soft); font-size: 13px; }
+.panel.error { background: #f6e7e2; border-color: var(--accent); }
+.panel.error h3 { color: var(--accent); font-style: normal; }
+.panel button { background: var(--ink); color: var(--paper); padding: 12px 24px; font-size: 10px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; }
+
+/* ---------- 分页 ---------- */
+.pager { display: flex; justify-content: center; align-items: center; gap: 6px; margin-top: 50px; flex-wrap: wrap; font-size: 11px; }
+.pager button { border: 1px solid var(--line); color: var(--ink-soft); padding: 9px 14px; font-size: 10px; font-weight: 800; letter-spacing: 1.4px; text-transform: uppercase; }
+.pager button:hover:not(:disabled) { border-color: var(--ink); color: var(--ink); }
+.pager button.on { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+
+/* ---------- 页脚 ---------- */
+footer { border-top: 3px double var(--ink); background: var(--paper-2); padding: 42px max(5vw, 22px) 56px; }
+.footer-inner { display: flex; justify-content: space-between; align-items: flex-start; gap: 30px; flex-wrap: wrap; }
+.footer-inner strong { font-family: var(--serif); font-size: 15px; letter-spacing: 3px; text-transform: uppercase; }
+.footer-inner p { margin: 10px 0 0; font-size: 13px; color: var(--ink-soft); max-width: 560px; line-height: 1.8; }
+.tmdb-logo { height: 26px; width: auto; opacity: .8; }
+.fine { margin: 26px 0 0; font-size: 11px; line-height: 1.85; color: var(--muted); max-width: 900px; }
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 700px) {
+  .topbar { gap: 16px; padding: 16px 18px 12px; flex-wrap: wrap; align-items: center; }
+  .logo { font-size: 22px; }
+  .topbar nav { gap: 14px; font-size: 10px; }
+  .results.grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 16px; }
+  .results.list .card { grid-template-columns: 76px 1fr; }
+  .results.list .thumb { width: 76px; height: 110px; }
+  .toolbar { align-items: flex-start; }
+  .hero-title { letter-spacing: -1.2px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .skew-poster, .skew-line { animation: none; }
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="logo" href="#top"><span class="logo-mark">&#9670;</span>MOVIE<em>LAB</em></a>
+  <nav><a href="#movies">Movies</a><a href="#about">About</a></nav>
+  <span class="status-pill" id="pill"><span class="dot"></span><span id="pillText">Offline</span></span>
+</header>
+
+<main id="top">
+  <section class="hero" id="hero">
+    <p class="kicker">Live Movie Data &middot; TMDB</p>
+    <h1 class="hero-title">Your next<br><span>story</span> starts here.</h1>
+    <p class="hero-sub">Browse popular titles, search the catalog, sort the way you like.</p>
+
+    <form id="keyForm" class="key-form">
+      <label class="label" for="keyInput">TMDB API Key (v3)</label>
+      <div class="field">
+        <input id="keyInput" type="password" placeholder="Paste your own API Key (v3)" autocomplete="off" spellcheck="false">
+        <button type="submit">Connect</button>
+      </div>
+      <p class="hint">Kept in this tab&rsquo;s memory only. Reloading clears it.
+        <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener">Get a key</a></p>
+    </form>
+
+    <form id="searchForm" class="search-form" style="display:none">
+      <div class="field">
+        <input id="queryInput" type="search" placeholder="Search a movie title&hellip;" autocomplete="off">
+        <button type="submit">Search</button>
+      </div>
+      <div class="quick-actions">
+        <button type="button" class="ghost" id="popularBtn">Popular</button>
+        <button type="button" class="ghost" id="clearBtn">Change key</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="catalog" id="movies">
+    <div class="toolbar">
+      <h2 id="catalogTitle">Popular movies</h2>
+      <div class="tools" id="tools" style="display:none">
+        <label class="sel-wrap"><span>Sort</span>
+          <select id="sortSelect">
+            <option value="default">Default</option>
+            <option value="rating">Top rated</option>
+            <option value="newest">Newest</option>
+            <option value="oldest">Oldest</option>
+            <option value="title">Title A&ndash;Z</option>
+          </select>
+        </label>
+        <div class="toggle">
+          <button type="button" id="gridBtn" class="on" aria-label="Grid view">&#9638;</button>
+          <button type="button" id="listBtn" aria-label="List view">&#9776;</button>
+        </div>
+      </div>
+    </div>
+
+    <p class="count" id="count" style="display:none"></p>
+    <div id="stage"></div>
+    <nav class="pager" id="pager" style="display:none"></nav>
+  </section>
+</main>
+
+<footer id="about">
+  <div class="footer-inner">
+    <div>
+      <strong>Movie Lab</strong>
+      <p>A classroom project with a custom editorial interface, powered by the TMDB API.
+         Built with Vue 3 + Vite, deployed as a static page.</p>
+    </div>
+    <a href="https://www.themoviedb.org/" target="_blank" rel="noopener">
+      <img class="tmdb-logo" alt="TMDB"
+        src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzNjAgODAiPjx0ZXh0IHg9IjAiIHk9IjYwIiBmb250LWZhbWlseT0iSGVsdmV0aWNhLEFyaWFsLHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iNTQiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSIjMDFiNGU0Ij5UTUVEQjwvdGV4dD48L3N2Zz4=">
+    </a>
+  </div>
+  <p class="fine">This product uses the TMDB API but is not endorsed or certified by TMDB.
+     Each visitor supplies their own API Key (v3), kept in memory and sent only to TMDB.
+     Movie data and posters need internet access.</p>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  var API_BASE = 'https://api.themoviedb.org/3';
+  var IMG = 'https://image.tmdb.org/t/p';
+
+  var state = {
+    apiKey: '',            // memory only
+    query: '',
+    activeQuery: '',
+    movies: [],
+    page: 1,
+    totalPages: 0,
+    totalResults: 0,
+    sort: 'default',
+    view: 'grid'
+  };
+
+  var el = {};
+  ['keyForm','searchForm','keyInput','queryInput','popularBtn','clearBtn',
+   'catalogTitle','tools','sortSelect','gridBtn','listBtn','count','stage','pager',
+   'pill','pillText','hero'].forEach(function (id) { el[id] = document.getElementById(id); });
+
+  /* ---------- helpers ---------- */
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+  function posterUrl(p) { return p ? IMG + '/w500' + p : ''; }
+  function yearOf(d) { return d ? String(d).slice(0, 4) : 'TBA'; }
+  function tone(v) { return v >= 7 ? 'good' : v >= 5 ? 'ok' : 'low'; }
+  function ratingOf(m) { return m.vote_count > 0 ? Number(m.vote_average).toFixed(1) : 'NR'; }
+  function pct(v) { return Math.round((Number(v) || 0) * 10) + '%'; }
+
+  function sorted() {
+    var list = state.movies.slice();
+    switch (state.sort) {
+      case 'rating': return list.sort(function (a, b) { return (b.vote_average || 0) - (a.vote_average || 0); });
+      case 'newest': return list.sort(function (a, b) { return String(b.release_date || '').localeCompare(String(a.release_date || '')); });
+      case 'oldest': return list.sort(function (a, b) { return String(a.release_date || '9999').localeCompare(String(b.release_date || '9999')); });
+      case 'title':  return list.sort(function (a, b) { return a.title.localeCompare(b.title); });
+      default:       return list;
+    }
+  }
+
+  /* ---------- render ---------- */
+  function setConnected(on) {
+    el.keyForm.style.display = on ? 'none' : '';
+    el.searchForm.style.display = on ? '' : 'none';
+    el.pill.classList.toggle('live', !!on);
+    el.pillText.textContent = on ? 'TMDB live' : 'Offline';
+  }
+
+  function renderHero() {
+    var hit = null;
+    for (var i = 0; i < state.movies.length; i++) {
+      if (state.movies[i].backdrop_path) { hit = state.movies[i]; break; }
+    }
+    if (hit) {
+      el.hero.classList.add('has-art');
+      el.hero.style.backgroundImage =
+        'linear-gradient(180deg, rgba(250,248,243,.62), rgba(250,248,243,.96)), url(' + IMG + '/w1280' + hit.backdrop_path + ')';
+    } else {
+      el.hero.classList.remove('has-art');
+      el.hero.style.backgroundImage = '';
+    }
+  }
+
+  function cardHtml(m) {
+    var thumb = posterUrl(m.poster_path)
+      ? '<img src="' + esc(posterUrl(m.poster_path)) + '" alt="' + esc(m.title) + ' poster" loading="lazy">'
+      : '<div class="thumb-fb"><strong>' + esc(m.title) + '</strong><span>No poster</span></div>';
+    return '<article class="card">' +
+      '<div class="thumb">' + thumb + '<span class="yb">' + esc(yearOf(m.release_date)) + '</span></div>' +
+      '<div class="body">' +
+        '<h3><a href="https://www.themoviedb.org/movie/' + m.id + '" target="_blank" rel="noopener">' + esc(m.title) + '</a></h3>' +
+        '<div class="score"><div class="bar"><i class="' + tone(m.vote_average) + '" style="width:' + pct(m.vote_average) + '"></i></div><b>' + ratingOf(m) + '</b></div>' +
+        '<p class="desc">' + esc(m.overview || 'No overview available.') + '</p>' +
+      '</div>' +
+    '</article>';
+  }
+
+  function skeletons(n) {
+    var one = state.view === 'list'
+      ? '<div class="skew-list"><div class="skew-poster"></div><div style="flex:1"><div class="skew-line w70"></div><div class="skew-line w45"></div></div></div>'
+      : '<div><div class="skew-poster"></div><div class="skew-line w70"></div><div class="skew-line w45"></div></div>';
+    var out = '';
+    for (var i = 0; i < n; i++) out += one;
+    return '<div class="skews ' + state.view + '">' + out + '</div>';
+  }
+
+  function renderPager() {
+    if (state.totalPages <= 1) { el.pager.style.display = 'none'; el.pager.innerHTML = ''; return; }
+    var total = state.totalPages, cur = state.page;
+    var start = Math.max(1, Math.min(cur - 3, total - 6));
+    var end = Math.min(total, start + 6);
+    var html = '<button data-p="1"' + (cur <= 1 ? ' disabled' : '') + '>&laquo; First</button>' +
+               '<button data-p="' + (cur - 1) + '"' + (cur <= 1 ? ' disabled' : '') + '>Prev</button>';
+    for (var p = start; p <= end; p++) {
+      html += '<button data-p="' + p + '" class="' + (p === cur ? 'on' : '') + '">' + p + '</button>';
+    }
+    html += '<button data-p="' + (cur + 1) + '"' + (cur >= total ? ' disabled' : '') + '>Next</button>' +
+            '<button data-p="' + total + '"' + (cur >= total ? ' disabled' : '') + '>Last &raquo;</button>';
+    el.pager.innerHTML = html;
+    el.pager.style.display = 'flex';
+  }
+
+  function render() {
+    var list = sorted();
+    el.catalogTitle.textContent = state.activeQuery
+      ? 'Results for \u201C' + state.activeQuery + '\u201D'
+      : 'Popular movies';
+
+    if (!state.apiKey) {
+      el.tools.style.display = 'none';
+      el.count.style.display = 'none';
+      el.pager.style.display = 'none';
+      el.stage.innerHTML = '<div class="panel"><h3>Connect to TMDB</h3>' +
+        '<p>Enter your API Key (v3) above to load real movies.</p></div>';
+      return;
+    }
+    if (state.loading) { el.tools.style.display = 'none'; el.stage.innerHTML = skeletons(8); return; }
+    if (state.error) {
+      el.tools.style.display = 'none';
+      el.count.style.display = 'none';
+      el.stage.innerHTML = '<div class="panel error" role="alert"><h3>Could not load movies</h3>' +
+        '<p>' + esc(state.error) + '</p><button type="button" id="retryBtn">Retry</button></div>';
+      var r = document.getElementById('retryBtn');
+      if (r) r.addEventListener('click', function () { load(state.page); });
+      return;
+    }
+    el.tools.style.display = 'flex';
+    el.count.style.display = 'block';
+    el.count.textContent = state.totalResults.toLocaleString() + ' results \u00B7 page ' +
+      state.page + ' / ' + state.totalPages + ' \u00B7 ' + list.length + ' shown';
+
+    if (!list.length) {
+      el.stage.innerHTML = '<div class="panel"><h3>No movies found</h3>' +
+        '<p>Try another title or browse popular movies.</p>' +
+        '<button type="button" id="popBtn">Show popular movies</button></div>';
+      var pb = document.getElementById('popBtn');
+      if (pb) pb.addEventListener('click', popular);
+      renderPager();
+      return;
+    }
+    var html = '';
+    for (var i = 0; i < list.length; i++) html += cardHtml(list[i]);
+    el.stage.innerHTML = '<div class="results ' + state.view + '">' + html + '</div>';
+    renderPager();
+  }
+
+  /* ---------- data ---------- */
+  function load(nextPage, term) {
+    if (!state.apiKey) return;
+    var page = nextPage || 1;
+    var q = (term === undefined) ? state.activeQuery : term;
+    state.loading = true; state.error = '';
+    render();
+
+    var endpoint = q ? '/search/movie' : '/movie/popular';
+    var params = new URLSearchParams({
+      api_key: state.apiKey, language: 'en-US', page: String(page)
+    });
+    if (q) { params.set('query', q); params.set('include_adult', 'false'); }
+
+    fetch(API_BASE + endpoint + '?' + params.toString(), {
+      headers: { accept: 'application/json' }
+    }).then(function (res) {
+      if (!res.ok) {
+        var msg = { 401: 'API key rejected. Check API Key (v3) in your TMDB settings.',
+                    403: 'Access was denied. Check your TMDB account and API permissions.',
+                    429: 'Too many requests. Wait a moment, then retry.' }[res.status];
+        throw new Error(msg || ('TMDB request failed (HTTP ' + res.status + '). Try again later.'));
+      }
+      return res.json();
+    }).then(function (data) {
+      state.movies = Array.isArray(data.results) ? data.results : [];
+      state.page = data.page || page;
+      state.totalPages = Math.min(data.total_pages || 0, 500);
+      state.totalResults = data.total_results || 0;
+      state.activeQuery = q;
+      state.loading = false;
+      renderHero();
+      render();
+    }).catch(function (err) {
+      state.error = err && err.message ? err.message : 'Could not reach TMDB. Check your connection.';
+      state.loading = false;
+      render();
+    });
+  }
+
+  function connect(key) {
+    state.apiKey = key.trim();
+    if (!state.apiKey) return;
+    state.query = ''; state.activeQuery = ''; el.queryInput.value = '';
+    setConnected(true);
+    load(1, '');
+  }
+  function popular() {
+    el.queryInput.value = '';
+    state.sort = 'default'; el.sortSelect.value = 'default';
+    load(1, '');
+  }
+
+  /* ---------- events ---------- */
+  el.keyForm.addEventListener('submit', function (e) { e.preventDefault(); connect(el.keyInput.value); });
+  el.searchForm.addEventListener('submit', function (e) { e.preventDefault(); load(1, el.queryInput.value.trim()); });
+  el.popularBtn.addEventListener('click', popular);
+  el.clearBtn.addEventListener('click', function () {
+    state.apiKey = ''; state.movies = []; state.error = ''; state.loading = false;
+    state.page = 1; state.totalPages = 0; state.totalResults = 0; state.activeQuery = '';
+    el.keyInput.value = ''; el.queryInput.value = '';
+    el.hero.classList.remove('has-art'); el.hero.style.backgroundImage = '';
+    setConnected(false);
+    render();
+  });
+  el.sortSelect.addEventListener('change', function () { state.sort = el.sortSelect.value; render(); });
+  el.gridBtn.addEventListener('click', function () {
+    state.view = 'grid'; el.gridBtn.classList.add('on'); el.listBtn.classList.remove('on'); render();
+  });
+  el.listBtn.addEventListener('click', function () {
+    state.view = 'list'; el.listBtn.classList.add('on'); el.gridBtn.classList.remove('on'); render();
+  });
+  el.pager.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('button[data-p]') : null;
+    if (!b || b.disabled) return;
+    load(parseInt(b.getAttribute('data-p'), 10));
+    document.getElementById('movies').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  setConnected(false);
+  render();
+})();
+</script>
+</body>
+</html>
